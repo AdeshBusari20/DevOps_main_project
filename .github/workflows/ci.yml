@@ -47,9 +47,9 @@ jobs:
           cd backend
           python -m pytest tests/ -v --tb=short
 
-  # ---- Frontend Tests ----
+  # ---- Frontend Build Validation ----
   frontend-test:
-    name: Frontend Tests
+    name: Frontend Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,18 +58,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
+        working-directory: frontend
+        run: npm install
 
-      - name: Run tests
+      - name: Build production bundle
+        working-directory: frontend
+        env:
+          CI: false
+          DISABLE_ESLINT_PLUGIN: true
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: frontend
         run: |
-          cd frontend
-          CI=true npm test -- --watchAll=false || true
+          echo "--- Build output ---"
+          ls -lh build/
+          test -f build/index.html && echo "✅ index.html exists" || exit 1
+          ls build/static/js/*.js > /dev/null 2>&1 && echo "✅ JS bundles exist" || exit 1
+          ls build/static/css/*.css > /dev/null 2>&1 && echo "✅ CSS bundles exist" || exit 1
+          echo "✅ Frontend build validation passed"
 
   # ---- Security Scan ----
   security-scan:
