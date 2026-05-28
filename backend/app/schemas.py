@@ -5,7 +5,7 @@ Defines data validation schemas for API request bodies and responses.
 Pydantic ensures type safety and automatic documentation in Swagger UI.
 """
 
-from datetime import date, datetime
+from datetime import date as Date, datetime
 from typing import Optional, List
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -35,8 +35,8 @@ class ExpenseCreate(BaseModel):
         default=None,
         description="Expense category (auto-categorized if not provided)",
     )
-    date: date = Field(
-        default_factory=date.today,
+    date: Date = Field(
+        default_factory=Date.today,
         description="Date of the expense",
     )
     description: Optional[str] = Field(
@@ -51,7 +51,7 @@ class ExpenseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     amount: Optional[float] = Field(None, gt=0)
     category: Optional[ExpenseCategory] = None
-    date: Optional[date] = None
+    date: Optional[Date] = None
     description: Optional[str] = Field(None, max_length=1000)
 
 
@@ -66,7 +66,7 @@ class ExpenseResponse(BaseModel):
     title: str
     amount: float
     category: ExpenseCategory
-    date: date
+    date: Date
     description: Optional[str]
     created_at: datetime
     updated_at: datetime

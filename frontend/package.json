@@ -4,14 +4,14 @@
   "private": true,
   "description": "React frontend for AI Expense Tracker with DevOps pipeline",
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0",
-    "react-scripts": "5.0.1",
     "axios": "^1.7.9",
     "chart.js": "^4.4.7",
+    "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",
+    "react-router-dom": "^6.28.0",
+    "react-scripts": "5.0.1",
     "react-toastify": "^10.0.6"
   },
   "scripts": {
@@ -21,7 +21,18 @@
     "eject": "react-scripts eject"
   },
   "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "eslint-plugin-react-hooks": "^4.6.2"
   }
 }
