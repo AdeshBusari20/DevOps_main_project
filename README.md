@@ -416,5 +416,5 @@ If you found this project helpful, please consider giving it a ⭐ on GitHub!
 ---
 
 <p align="center">
-  Built with ❤️ by <a href="https://github.com/adeshbusari20">Adesh Busari</a>
+  Built by <a href="https://github.com/adeshbusari20">Adesh Busari</a>
 </p>
