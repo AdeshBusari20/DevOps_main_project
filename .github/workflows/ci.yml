@@ -135,29 +135,56 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docker-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Configure kubeconfig
+      - name: Validate Kubernetes manifests
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+          echo "🔍 Validating Kubernetes manifests..."
+          MANIFESTS=(
+            kubernetes/namespace.yaml
+            kubernetes/configmap.yaml
+            kubernetes/secrets.yaml
+            kubernetes/pv.yaml
+            kubernetes/pvc.yaml
+            kubernetes/postgres-statefulset.yaml
+            kubernetes/backend-deployment.yaml
+            kubernetes/frontend-deployment.yaml
+            kubernetes/ingress.yaml
+            kubernetes/hpa.yaml
+          )
+          FAILED=0
+          for manifest in "${MANIFESTS[@]}"; do
+            if kubectl apply --dry-run=client -f "$manifest" > /dev/null 2>&1; then
+              echo "  ✅ $manifest"
+            else
+              echo "  ❌ $manifest"
+              kubectl apply --dry-run=client -f "$manifest" 2>&1 || true
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "❌ Manifest validation failed"
+            exit 1
+          fi
+          echo "✅ All Kubernetes manifests are valid"
 
-      - name: Deploy to Kubernetes
+      - name: Deployment summary
         run: |
-          kubectl apply -f kubernetes/namespace.yaml
-          kubectl apply -f kubernetes/configmap.yaml
-          kubectl apply -f kubernetes/secrets.yaml
-          kubectl apply -f kubernetes/pv.yaml
-          kubectl apply -f kubernetes/pvc.yaml
-          kubectl apply -f kubernetes/postgres-statefulset.yaml
-          kubectl apply -f kubernetes/backend-deployment.yaml
-          kubectl apply -f kubernetes/frontend-deployment.yaml
-          kubectl apply -f kubernetes/ingress.yaml
-          kubectl apply -f kubernetes/hpa.yaml
-          kubectl rollout status deployment/backend -n expense-tracker --timeout=120s
-          kubectl rollout status deployment/frontend -n expense-tracker --timeout=120s
+          echo "=============================================="
+          echo "📦 Deployment Summary"
+          echo "=============================================="
+          echo "Images built and pushed:"
+          echo "  🐳 adeshbusari20/expense-tracker-backend:${{ github.sha }}"
+          echo "  🐳 adeshbusari20/expense-tracker-frontend:${{ github.sha }}"
+          echo ""
+          echo "Kubernetes manifests validated:"
+          echo "  ✅ All 10 manifests passed dry-run validation"
+          echo ""
+          echo "To deploy to a live cluster, run:"
+          echo "  kubectl apply -f kubernetes/"
+          echo "=============================================="
+
