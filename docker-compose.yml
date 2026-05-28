@@ -1,0 +1,93 @@
+# ==============================================
+# Docker Compose - Development Environment
+# ==============================================
+# Runs the full stack locally: Frontend, Backend, PostgreSQL, NGINX
+# Usage: docker compose up -d
+# ==============================================
+
+services:
+  # ---- PostgreSQL Database ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: expense-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: expense_user
+      POSTGRES_PASSWORD: expense_pass_change_me
+      POSTGRES_DB: expense_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U expense_user -d expense_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - expense-network
+
+  # ---- FastAPI Backend ----
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: expense-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://expense_user:expense_pass_change_me@postgres:5432/expense_tracker
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - expense-network
+
+  # ---- React Frontend ----
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: expense-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - expense-network
+
+  # ---- NGINX Reverse Proxy ----
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: expense-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - expense-network
+
+# ---- Named Volumes ----
+volumes:
+  postgres_data:
+    driver: local
+
+# ---- Network ----
+networks:
+  expense-network:
+    driver: bridge

@@ -1,0 +1,18 @@
+# PersistentVolume - Physical storage on the node
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  namespace: expense-tracker
+  labels:
+    type: local
+    app: expense-tracker
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /mnt/data/postgres

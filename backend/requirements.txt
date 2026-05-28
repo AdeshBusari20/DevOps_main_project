@@ -1,0 +1,33 @@
+# ==============================================
+# AI Expense Tracker - Backend Dependencies
+# ==============================================
+# Install: pip install -r requirements.txt
+# ==============================================
+
+# ---- Core Framework ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# ---- Database ----
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.1
+
+# ---- Data Validation ----
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# ---- Monitoring ----
+prometheus-client==0.21.1
+
+# ---- Testing ----
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1
+
+# ---- Code Quality ----
+flake8==7.1.1
+mypy==1.14.1
+
+# ---- Security ----
+python-dotenv==1.0.1

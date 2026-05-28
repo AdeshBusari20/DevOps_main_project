@@ -1,0 +1,16 @@
+git:latest
+github:latest
+github-branch-source:latest
+workflow-aggregator:latest
+pipeline-stage-view:latest
+docker-workflow:latest
+docker-plugin:latest
+sonar:latest
+kubernetes:latest
+kubernetes-cli:latest
+credentials-binding:latest
+timestamper:latest
+ws-cleanup:latest
+junit:latest
+slack:latest
+blueocean:latest

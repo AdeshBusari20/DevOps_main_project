@@ -1,0 +1,9 @@
+# Kubernetes Namespace
+# Isolates all expense-tracker resources in their own namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: expense-tracker
+  labels:
+    app: expense-tracker
+    environment: production

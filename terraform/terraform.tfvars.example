@@ -1,0 +1,13 @@
+# ==============================================
+# Example Terraform Variables File
+# ==============================================
+# Copy to terraform.tfvars and fill in your values
+# terraform.tfvars is gitignored for security
+# ==============================================
+
+aws_region     = "ap-south-1"
+environment    = "prod"
+project_name   = "expense-tracker"
+instance_type  = "t2.medium"
+key_pair_name  = "expense-tracker-key"
+allowed_ssh_cidr = "YOUR_IP/32"  # Replace with your public IP

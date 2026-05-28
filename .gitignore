@@ -1,0 +1,107 @@
+# ========================
+# Python / Backend
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ========================
+# Node / Frontend
+# ========================
+node_modules/
+frontend/build/
+frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.local
+.env.production
+.env.*.local
+*.pem
+*.key
+*.crt
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+
+# ========================
+# Docker
+# ========================
+docker-compose.override.yml
+
+# ========================
+# Terraform
+# ========================
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+!terraform/terraform.tfvars.example
+
+# ========================
+# Ansible
+# ========================
+ansible/*.retry
+ansible/**/*.retry
+
+# ========================
+# IDE & Editors
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ========================
+# Jenkins
+# ========================
+jenkins_home/
+
+# ========================
+# Monitoring
+# ========================
+monitoring/prometheus/data/
+monitoring/grafana/data/
+
+# ========================
+# Misc
+# ========================
+*.log
+*.tmp
+coverage/
+htmlcov/
+.coverage
+.pytest_cache/
+.mypy_cache/
+sonar-project.properties.local

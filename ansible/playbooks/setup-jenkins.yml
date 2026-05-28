@@ -1,0 +1,59 @@
+# ==============================================
+# Playbook: Install Jenkins
+# ==============================================
+---
+- name: Install Jenkins CI/CD Server
+  hosts: jenkins_servers
+  become: yes
+  tasks:
+    - name: Install Java JDK 17
+      apt:
+        name: fontconfig openjdk-17-jre
+        state: present
+        update_cache: yes
+
+    - name: Add Jenkins GPG key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        state: present
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Add Jenkins user to Docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+
+    - name: Start and enable Jenkins
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Wait for Jenkins to start
+      wait_for:
+        port: 8080
+        timeout: 60
+
+    - name: Get Jenkins initial admin password
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_password
+
+    - name: Display Jenkins initial password
+      debug:
+        msg: |
+          ====================================
+          Jenkins Initial Admin Password:
+          {{ jenkins_password.stdout }}
+          Access Jenkins at: http://{{ ansible_host }}:8080
+          ====================================

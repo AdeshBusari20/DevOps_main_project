@@ -1,0 +1,100 @@
+# Backend Deployment + Service
+# Runs FastAPI pods with rolling update strategy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: expense-tracker
+  labels:
+    app: expense-tracker
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: expense-tracker
+      component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # Allow 1 extra pod during update
+      maxUnavailable: 0     # Never have 0 running pods
+  template:
+    metadata:
+      labels:
+        app: expense-tracker
+        component: backend
+    spec:
+      containers:
+        - name: backend
+          image: adeshbusari20/expense-tracker-backend:latest
+          ports:
+            - containerPort: 8000
+              name: http
+          # Environment from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: expense-tracker-config
+          # Sensitive env from Secret
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: expense-tracker-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: expense-tracker-secrets
+                  key: POSTGRES_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/expense_tracker"
+          # Liveness probe - Is the container alive?
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Readiness probe - Is the container ready to serve traffic?
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Resource limits
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+---
+# Backend ClusterIP Service
+# Internal service for pod-to-pod communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: expense-tracker
+  labels:
+    app: expense-tracker
+    component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: expense-tracker
+    component: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http

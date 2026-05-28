@@ -1,0 +1,23 @@
+---
+- name: Disable swap
+  command: swapoff -a
+  changed_when: false
+
+- name: Add Kubernetes repository key
+  apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key
+
+- name: Add Kubernetes repository
+  apt_repository:
+    repo: "deb https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /"
+
+- name: Install Kubernetes components
+  apt:
+    name: [kubelet, kubeadm, kubectl]
+    state: present
+    update_cache: yes
+
+- name: Enable kubelet
+  systemd:
+    name: kubelet
+    enabled: yes

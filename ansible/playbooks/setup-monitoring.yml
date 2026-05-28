@@ -1,0 +1,53 @@
+# ==============================================
+# Playbook: Setup Monitoring Stack
+# ==============================================
+---
+- name: Setup Prometheus + Grafana Monitoring
+  hosts: monitoring_servers
+  become: yes
+  tasks:
+    - name: Create monitoring directory
+      file:
+        path: /opt/monitoring
+        state: directory
+        mode: '0755'
+
+    - name: Copy monitoring docker-compose file
+      copy:
+        src: ../../monitoring/docker-compose.monitoring.yml
+        dest: /opt/monitoring/docker-compose.yml
+
+    - name: Copy Prometheus config
+      copy:
+        src: ../../monitoring/prometheus/
+        dest: /opt/monitoring/prometheus/
+
+    - name: Copy Grafana dashboards
+      copy:
+        src: ../../monitoring/grafana/
+        dest: /opt/monitoring/grafana/
+
+    - name: Copy AlertManager config
+      copy:
+        src: ../../monitoring/alertmanager/
+        dest: /opt/monitoring/alertmanager/
+
+    - name: Start monitoring stack
+      command: docker compose up -d
+      args:
+        chdir: /opt/monitoring
+
+    - name: Wait for Grafana to start
+      wait_for:
+        port: 3001
+        timeout: 60
+
+    - name: Display monitoring URLs
+      debug:
+        msg: |
+          ====================================
+          Monitoring Stack is running!
+          Prometheus: http://{{ ansible_host }}:9090
+          Grafana:    http://{{ ansible_host }}:3001
+          (Default login: admin/admin)
+          ====================================

@@ -1,0 +1,11 @@
+# Global variables for all hosts
+---
+project_name: ai-expense-tracker
+dockerhub_username: adeshbusari20
+app_version: latest
+backend_port: 8000
+frontend_port: 3000
+postgres_port: 5432
+jenkins_port: 8080
+grafana_port: 3001
+prometheus_port: 9090

@@ -1,0 +1,59 @@
+# ==============================================
+# Playbook: Deploy Application
+# ==============================================
+---
+- name: Deploy AI Expense Tracker Application
+  hosts: app_servers
+  become: yes
+  vars:
+    app_dir: /opt/expense-tracker
+  tasks:
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Pull latest Docker images
+      command: "docker pull {{ dockerhub_username }}/expense-tracker-{{ item }}:{{ app_version }}"
+      loop:
+        - frontend
+        - backend
+
+    - name: Copy docker-compose.prod.yml
+      copy:
+        src: ../../docker-compose.prod.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+
+    - name: Copy NGINX configuration
+      copy:
+        src: ../../nginx/
+        dest: "{{ app_dir }}/nginx/"
+
+    - name: Create .env file
+      template:
+        src: ../../.env.example
+        dest: "{{ app_dir }}/.env"
+
+    - name: Deploy application
+      command: docker compose up -d --pull always
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Wait for backend to be healthy
+      uri:
+        url: "http://localhost:8000/health"
+        status_code: 200
+      register: health_check
+      retries: 10
+      delay: 5
+      until: health_check.status == 200
+
+    - name: Display deployment info
+      debug:
+        msg: |
+          ====================================
+          Application deployed successfully!
+          URL: http://{{ ansible_host }}
+          API: http://{{ ansible_host }}:8000/docs
+          ====================================

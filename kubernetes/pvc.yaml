@@ -1,0 +1,16 @@
+# PersistentVolumeClaim - Request for storage
+# Pods reference this claim to get persistent storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: expense-tracker
+  labels:
+    app: expense-tracker
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
