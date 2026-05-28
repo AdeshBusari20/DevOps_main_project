@@ -141,35 +141,26 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
 
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+          kubeconform -v
+
       - name: Validate Kubernetes manifests
         run: |
           echo "🔍 Validating Kubernetes manifests..."
-          MANIFESTS=(
-            kubernetes/namespace.yaml
-            kubernetes/configmap.yaml
-            kubernetes/secrets.yaml
-            kubernetes/pv.yaml
-            kubernetes/pvc.yaml
-            kubernetes/postgres-statefulset.yaml
-            kubernetes/backend-deployment.yaml
-            kubernetes/frontend-deployment.yaml
-            kubernetes/ingress.yaml
-            kubernetes/hpa.yaml
-          )
-          FAILED=0
-          for manifest in "${MANIFESTS[@]}"; do
-            if kubectl apply --dry-run=client -f "$manifest" > /dev/null 2>&1; then
-              echo "  ✅ $manifest"
-            else
-              echo "  ❌ $manifest"
-              kubectl apply --dry-run=client -f "$manifest" 2>&1 || true
-              FAILED=1
-            fi
-          done
-          if [ "$FAILED" -eq 1 ]; then
-            echo "❌ Manifest validation failed"
-            exit 1
-          fi
+          echo ""
+          echo "--- Schema Validation (kubeconform) ---"
+          kubeconform -summary -strict \
+            -kubernetes-version 1.29.0 \
+            -output text \
+            kubernetes/*.yaml
+          echo ""
+          echo "--- Syntax Check (kubectl dry-run) ---"
+          kubectl apply --dry-run=client --validate=false -f kubernetes/ 2>&1
+          echo ""
           echo "✅ All Kubernetes manifests are valid"
 
       - name: Deployment summary
