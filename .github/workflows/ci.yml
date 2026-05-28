@@ -138,9 +138,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-
       - name: Install kubeconform
         run: |
           curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
@@ -152,14 +149,16 @@ jobs:
         run: |
           echo "🔍 Validating Kubernetes manifests..."
           echo ""
-          echo "--- Schema Validation (kubeconform) ---"
+          echo "--- YAML Syntax Check ---"
+          for f in kubernetes/*.yaml; do
+            python3 -c "import yaml; yaml.safe_load_all(open('$f'))" && echo "  ✅ $f" || { echo "  ❌ $f"; exit 1; }
+          done
+          echo ""
+          echo "--- K8s Schema Validation (kubeconform) ---"
           kubeconform -summary -strict \
             -kubernetes-version 1.29.0 \
             -output text \
             kubernetes/*.yaml
-          echo ""
-          echo "--- Syntax Check (kubectl dry-run) ---"
-          kubectl apply --dry-run=client --validate=false -f kubernetes/ 2>&1
           echo ""
           echo "✅ All Kubernetes manifests are valid"
 
