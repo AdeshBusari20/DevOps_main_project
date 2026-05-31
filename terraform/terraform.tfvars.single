@@ -11,9 +11,6 @@
 #   terraform apply
 # ==============================================
 
-# ---- Enable single-instance mode ----
-single_instance_mode = true
-
 # ---- AWS Region ----
 aws_region   = "ap-south-1"    # Mumbai (closest to India)
 environment  = "prod"

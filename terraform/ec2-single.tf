@@ -4,17 +4,11 @@
 # Deploys ALL services (app + monitoring) on a
 # single EC2 instance for college portfolio use.
 #
-# Usage:
-#   terraform plan -var-file="terraform.tfvars.single"
-#   terraform apply -var-file="terraform.tfvars.single"
-#
 # Cost: $0/month (free-tier t2.micro) or ~$18/month (t2.small)
 # ==============================================
 
 # ---- Single All-in-One Server ----
 resource "aws_instance" "single_server" {
-  count = var.single_instance_mode ? 1 : 0
-
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.single_instance_type
   key_name               = var.key_pair_name
@@ -122,8 +116,7 @@ resource "aws_instance" "single_server" {
 
 # ---- Elastic IP for the single server ----
 resource "aws_eip" "single_server" {
-  count    = var.single_instance_mode ? 1 : 0
-  instance = aws_instance.single_server[0].id
+  instance = aws_instance.single_server.id
   domain   = "vpc"
 
   tags = {
@@ -132,12 +125,6 @@ resource "aws_eip" "single_server" {
 }
 
 # ---- Variables for single-instance mode ----
-variable "single_instance_mode" {
-  description = "Enable single-instance deployment (cost-optimized)"
-  type        = bool
-  default     = false
-}
-
 variable "single_instance_type" {
   description = "Instance type for single-server deployment"
   type        = string
@@ -148,35 +135,4 @@ variable "single_instance_volume_size" {
   description = "Root EBS volume size in GB for single server"
   type        = number
   default     = 30
-}
-
-# ---- Outputs for single-instance mode ----
-output "single_server_public_ip" {
-  description = "Public IP of the single all-in-one server"
-  value       = var.single_instance_mode ? aws_eip.single_server[0].public_ip : "N/A (multi-server mode)"
-}
-
-output "single_server_ssh" {
-  description = "SSH command for the single server"
-  value       = var.single_instance_mode ? "ssh -i ${var.key_pair_name}.pem ubuntu@${aws_eip.single_server[0].public_ip}" : "N/A"
-}
-
-output "single_server_app_url" {
-  description = "Application URL (single-server mode)"
-  value       = var.single_instance_mode ? "http://${aws_eip.single_server[0].public_ip}" : "N/A"
-}
-
-output "single_server_nip_url" {
-  description = "Application URL via nip.io (single-server mode)"
-  value       = var.single_instance_mode ? "http://${replace(aws_eip.single_server[0].public_ip, ".", "-")}.nip.io" : "N/A"
-}
-
-output "single_server_grafana_url" {
-  description = "Grafana URL (single-server mode)"
-  value       = var.single_instance_mode ? "http://${aws_eip.single_server[0].public_ip}:3001" : "N/A"
-}
-
-output "single_server_prometheus_url" {
-  description = "Prometheus URL (single-server mode)"
-  value       = var.single_instance_mode ? "http://${aws_eip.single_server[0].public_ip}:9090" : "N/A"
 }
