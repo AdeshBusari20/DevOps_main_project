@@ -1,0 +1,30 @@
+# ==============================================
+# Terraform Variables - Single Instance (Option A)
+# ==============================================
+# Cost-optimized: All services on one EC2 instance
+# Perfect for college portfolio projects
+#
+# Usage:
+#   cp terraform.tfvars.single terraform.tfvars
+#   terraform init
+#   terraform plan
+#   terraform apply
+# ==============================================
+
+# ---- Enable single-instance mode ----
+single_instance_mode = true
+
+# ---- AWS Region ----
+aws_region   = "ap-south-1"    # Mumbai (closest to India)
+environment  = "prod"
+project_name = "expense-tracker"
+
+# ---- Instance Configuration ----
+# Free-tier: "t2.micro"  (1 vCPU, 1GB RAM — tight but works)
+# Recommended: "t2.small" (1 vCPU, 2GB RAM — ~$18/month)
+single_instance_type       = "t2.small"
+single_instance_volume_size = 30
+
+# ---- SSH Access ----
+key_pair_name    = "expense-tracker-key"
+allowed_ssh_cidr = "0.0.0.0/0"  # Replace with YOUR_PUBLIC_IP/32 for security!

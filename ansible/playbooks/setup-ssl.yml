@@ -1,0 +1,140 @@
+# ==============================================
+# Playbook: Setup SSL Certificate (Let's Encrypt)
+# ==============================================
+# Provisions and configures SSL certificates
+# using Let's Encrypt Certbot.
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/setup-ssl.yml
+#   ansible-playbook -i inventory/hosts.ini playbooks/setup-ssl.yml -e "domain=your-domain.com"
+# ==============================================
+---
+- name: Setup SSL Certificate with Let's Encrypt
+  hosts: app_servers
+  become: yes
+  vars:
+    app_dir: /opt/expense-tracker
+    ssl_dir: /opt/expense-tracker/nginx/ssl
+    certbot_email: "admin@expense-tracker.dev"
+
+  tasks:
+    # ---- Install Certbot ----
+    - name: Install Certbot
+      apt:
+        name: certbot
+        state: present
+        update_cache: yes
+
+    # ---- Detect domain ----
+    - name: Get server public IP
+      uri:
+        url: http://checkip.amazonaws.com
+        return_content: yes
+      register: public_ip_response
+      when: domain is not defined
+
+    - name: Set domain to nip.io if not provided
+      set_fact:
+        ssl_domain: "{{ domain | default((public_ip_response.content | trim | replace('.', '-')) + '.nip.io') }}"
+
+    - name: Display domain
+      debug:
+        msg: "Setting up SSL for: {{ ssl_domain }}"
+
+    # ---- Stop Nginx temporarily ----
+    - name: Stop nginx for certificate challenge
+      command: docker compose -f docker-compose.prod.single.yml stop nginx
+      args:
+        chdir: "{{ app_dir }}"
+      ignore_errors: yes
+
+    # ---- Obtain SSL Certificate ----
+    - name: Request SSL certificate from Let's Encrypt
+      command: >
+        certbot certonly
+        --standalone
+        --non-interactive
+        --agree-tos
+        --email {{ certbot_email }}
+        --domain {{ ssl_domain }}
+        --preferred-challenges http
+      register: certbot_result
+
+    - name: Display certbot result
+      debug:
+        msg: "{{ certbot_result.stdout_lines }}"
+
+    # ---- Copy certificates ----
+    - name: Create SSL directory
+      file:
+        path: "{{ ssl_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy fullchain certificate
+      copy:
+        src: "/etc/letsencrypt/live/{{ ssl_domain }}/fullchain.pem"
+        dest: "{{ ssl_dir }}/fullchain.pem"
+        remote_src: yes
+        mode: '0644'
+
+    - name: Copy private key
+      copy:
+        src: "/etc/letsencrypt/live/{{ ssl_domain }}/privkey.pem"
+        dest: "{{ ssl_dir }}/privkey.pem"
+        remote_src: yes
+        mode: '0600'
+
+    # ---- Activate HTTPS Nginx config ----
+    - name: Backup current nginx config
+      copy:
+        src: "{{ app_dir }}/nginx/conf.d/default.conf"
+        dest: "{{ app_dir }}/nginx/conf.d/default.conf.http-backup"
+        remote_src: yes
+      ignore_errors: yes
+
+    - name: Activate production HTTPS config
+      copy:
+        src: "{{ app_dir }}/nginx/conf.d/production.conf"
+        dest: "{{ app_dir }}/nginx/conf.d/default.conf"
+        remote_src: yes
+
+    # ---- Restart Nginx ----
+    - name: Restart nginx with SSL
+      command: docker compose -f docker-compose.prod.single.yml restart nginx
+      args:
+        chdir: "{{ app_dir }}"
+
+    # ---- Setup auto-renewal ----
+    - name: Create renewal script
+      copy:
+        dest: "{{ app_dir }}/scripts/renew-ssl.sh"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          certbot renew --quiet --deploy-hook "
+              cp /etc/letsencrypt/live/*/fullchain.pem {{ ssl_dir }}/fullchain.pem
+              cp /etc/letsencrypt/live/*/privkey.pem {{ ssl_dir }}/privkey.pem
+              cd {{ app_dir }} && docker compose -f docker-compose.prod.single.yml restart nginx
+          "
+
+    - name: Setup auto-renewal cron job
+      cron:
+        name: "SSL certificate renewal"
+        minute: "0"
+        hour: "0,12"
+        job: "{{ app_dir }}/scripts/renew-ssl.sh >> /var/log/ssl-renewal.log 2>&1"
+
+    # ---- Display Results ----
+    - name: Display SSL setup results
+      debug:
+        msg: |
+          =============================================
+          🔐 SSL Certificate Configured!
+          =============================================
+          Domain: {{ ssl_domain }}
+          HTTPS:  https://{{ ssl_domain }}
+          Cert:   {{ ssl_dir }}/fullchain.pem
+          Key:    {{ ssl_dir }}/privkey.pem
+          Renewal: Automatic (twice daily)
+          =============================================

@@ -1,0 +1,244 @@
+# ==============================================
+# Playbook: Full Production Deployment
+# ==============================================
+# Deploys the complete AI Expense Tracker stack
+# to an EC2 instance using Docker Compose.
+#
+# Includes: App + Monitoring + Firewall + Security
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/deploy-production.yml
+# ==============================================
+---
+- name: Deploy AI Expense Tracker - Production
+  hosts: app_servers
+  become: yes
+  vars:
+    app_dir: /opt/expense-tracker
+    repo_url: https://github.com/AdeshBusari20/DevOps_main_project.git
+    compose_file: docker-compose.prod.single.yml
+    dockerhub_username: adeshbusari20
+
+  tasks:
+    # ---- System Preparation ----
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential packages
+      apt:
+        name:
+          - git
+          - curl
+          - jq
+          - ufw
+          - fail2ban
+          - certbot
+          - unzip
+        state: present
+
+    # ---- Create swap file for t2.micro ----
+    - name: Check if swap file exists
+      stat:
+        path: /swapfile
+      register: swap_file
+
+    - name: Create swap file (2GB)
+      command: fallocate -l 2G /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Set swap file permissions
+      file:
+        path: /swapfile
+        mode: '0600'
+      when: not swap_file.stat.exists
+
+    - name: Make swap
+      command: mkswap /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Enable swap
+      command: swapon /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Add swap to fstab
+      lineinfile:
+        path: /etc/fstab
+        line: '/swapfile none swap sw 0 0'
+        state: present
+
+    # ---- Firewall Configuration ----
+    - name: Configure UFW defaults
+      ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: incoming, policy: deny }
+        - { direction: outgoing, policy: allow }
+
+    - name: Allow required ports through UFW
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - '22'     # SSH
+        - '80'     # HTTP
+        - '443'    # HTTPS
+        - '3001'   # Grafana
+        - '9090'   # Prometheus
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    # ---- Fail2Ban ----
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+    # ---- Application Setup ----
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Clone or update repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: main
+        force: yes
+      become_user: ubuntu
+
+    - name: Create required directories
+      file:
+        path: "{{ app_dir }}/{{ item }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+      loop:
+        - nginx/ssl
+        - backups
+
+    # ---- Generate Production .env ----
+    - name: Get server public IP
+      uri:
+        url: http://checkip.amazonaws.com
+        return_content: yes
+      register: public_ip_response
+
+    - name: Set public IP fact
+      set_fact:
+        server_public_ip: "{{ public_ip_response.content | trim }}"
+
+    - name: Generate random database password
+      command: openssl rand -base64 24
+      register: db_password_raw
+
+    - name: Generate random secret key
+      command: openssl rand -base64 48
+      register: secret_key_raw
+
+    - name: Generate random Grafana password
+      command: openssl rand -base64 16
+      register: grafana_password_raw
+
+    - name: Create production .env file
+      copy:
+        dest: "{{ app_dir }}/.env"
+        mode: '0600'
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          APP_NAME=ai-expense-tracker
+          APP_ENV=production
+          DEBUG=false
+          BACKEND_PORT=8000
+          SECRET_KEY={{ secret_key_raw.stdout | regex_replace('[^a-zA-Z0-9]', '') | truncate(64, True, '') }}
+          ALGORITHM=HS256
+          POSTGRES_USER=expense_user
+          POSTGRES_PASSWORD={{ db_password_raw.stdout | regex_replace('[^a-zA-Z0-9]', '') | truncate(32, True, '') }}
+          POSTGRES_DB=expense_tracker
+          POSTGRES_HOST=postgres
+          POSTGRES_PORT=5432
+          DATABASE_URL=postgresql+asyncpg://expense_user:{{ db_password_raw.stdout | regex_replace('[^a-zA-Z0-9]', '') | truncate(32, True, '') }}@postgres:5432/expense_tracker
+          REACT_APP_API_URL=http://{{ server_public_ip }}/api/v1
+          FRONTEND_PORT=3000
+          DOCKERHUB_USERNAME={{ dockerhub_username }}
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD={{ grafana_password_raw.stdout | regex_replace('[^a-zA-Z0-9]', '') | truncate(20, True, '') }}
+          PROMETHEUS_PORT=9090
+          GRAFANA_PORT=3001
+          PUBLIC_IP={{ server_public_ip }}
+          DOMAIN={{ server_public_ip | replace('.', '-') }}.nip.io
+
+    # ---- Pull Docker Images ----
+    - name: Pull Docker images
+      command: "docker pull {{ item }}"
+      loop:
+        - "{{ dockerhub_username }}/expense-tracker-backend:latest"
+        - "{{ dockerhub_username }}/expense-tracker-frontend:latest"
+        - postgres:16-alpine
+        - nginx:1.27-alpine
+        - prom/prometheus:v2.53.0
+        - grafana/grafana:11.0.0
+        - prom/node-exporter:v1.8.1
+        - prom/alertmanager:v0.27.0
+        - gcr.io/cadvisor/cadvisor:v0.49.1
+
+    # ---- Deploy Application Stack ----
+    - name: Stop existing containers
+      command: docker compose -f {{ compose_file }} down --remove-orphans
+      args:
+        chdir: "{{ app_dir }}"
+      ignore_errors: yes
+
+    - name: Deploy application stack
+      command: docker compose -f {{ compose_file }} up -d
+      args:
+        chdir: "{{ app_dir }}"
+
+    # ---- Health Checks ----
+    - name: Wait for backend to be healthy
+      uri:
+        url: "http://localhost:8000/health"
+        status_code: 200
+      register: health_check
+      retries: 20
+      delay: 5
+      until: health_check.status == 200
+
+    - name: Wait for Grafana to start
+      wait_for:
+        port: 3001
+        timeout: 120
+
+    # ---- Display Results ----
+    - name: Display deployment information
+      debug:
+        msg: |
+          =============================================
+          🎉 Production Deployment Complete!
+          =============================================
+
+          Application:
+            Frontend:   http://{{ server_public_ip }}
+            API Docs:   http://{{ server_public_ip }}/docs
+            nip.io:     http://{{ server_public_ip | replace('.', '-') }}.nip.io
+
+          Monitoring:
+            Grafana:    http://{{ server_public_ip }}:3001
+            Prometheus: http://{{ server_public_ip }}:9090
+
+          Next Steps:
+            1. SSH: ssh -i ~/.ssh/expense-tracker-key.pem ubuntu@{{ server_public_ip }}
+            2. SSL: sudo bash /opt/expense-tracker/scripts/setup-ssl.sh
+          =============================================

@@ -198,21 +198,45 @@ curl http://localhost:8000/health
 
 ```
 AI-Expense-Tracker-DevOps/
-├── frontend/              # React application
-├── backend/               # FastAPI application
-├── kubernetes/            # K8s manifests (10 files)
-├── terraform/             # AWS IaC (9 files)
-├── ansible/               # Server automation (5 playbooks + 3 roles)
-├── monitoring/            # Prometheus + Grafana + AlertManager
-├── jenkins/               # Custom Jenkins Docker image
-├── nginx/                 # Reverse proxy configuration
-├── scripts/               # Utility scripts (setup, deploy, backup)
-├── docs/                  # Documentation (6 guides)
-├── .github/workflows/     # GitHub Actions CI
-├── docker-compose.yml     # Development environment
-├── docker-compose.prod.yml # Production environment
-├── Jenkinsfile            # 11-stage CI/CD pipeline
-├── Makefile               # Convenience commands
+├── frontend/                       # React application
+├── backend/                        # FastAPI application
+├── kubernetes/                     # K8s manifests (10 files)
+├── terraform/                      # AWS IaC (11 files)
+│   ├── ec2.tf                      # Multi-server EC2 config
+│   ├── ec2-single.tf               # Single-server (Option A)
+│   ├── vpc.tf                      # VPC + networking
+│   ├── security-groups.tf          # Firewall rules
+│   ├── iam.tf                      # IAM roles & policies
+│   └── terraform.tfvars.single     # Single-instance variables
+├── ansible/                        # Server automation (7 playbooks + 3 roles)
+│   └── playbooks/
+│       ├── deploy-production.yml   # Full production deploy
+│       ├── setup-ssl.yml           # Let's Encrypt SSL
+│       └── ...                     # Docker, Jenkins, K8s, Monitoring
+├── monitoring/                     # Prometheus + Grafana + AlertManager
+├── jenkins/                        # Custom Jenkins Docker image
+├── nginx/                          # Reverse proxy configuration
+│   └── conf.d/
+│       ├── default.conf            # HTTP config
+│       └── production.conf         # HTTPS production config
+├── scripts/                        # Utility scripts
+│   ├── deploy-production.sh        # One-command production deploy
+│   ├── provision-aws.sh            # AWS infrastructure provisioning
+│   ├── setup-ssl.sh                # Let's Encrypt SSL automation
+│   ├── deploy.sh                   # K8s deployment
+│   ├── setup.sh                    # Local dev setup
+│   ├── health-check.sh             # Service health checks
+│   └── backup-db.sh                # Database backup
+├── docs/                           # Documentation (7 guides)
+│   ├── PRODUCTION_DEPLOYMENT.md    # Complete cloud deployment guide
+│   └── ...                         # API, Architecture, Security, etc.
+├── .github/workflows/              # GitHub Actions CI
+├── docker-compose.yml              # Development environment
+├── docker-compose.prod.yml         # Production environment
+├── docker-compose.prod.single.yml  # All-in-one (app + monitoring)
+├── .env.production.example         # Production env template
+├── Jenkinsfile                     # 11-stage CI/CD pipeline
+├── Makefile                        # Convenience commands
 └── README.md
 ```
 
@@ -366,15 +390,90 @@ GET    /metrics                       # Prometheus metrics
 
 ## 📸 Screenshots
 
-> Add your screenshots to the `screenshots/` directory
+> **How to capture screenshots for your portfolio:**
 
-| Dashboard | Add Expense | Expense List |
-|-----------|-------------|--------------|
-| *Coming soon* | *Coming soon* | *Coming soon* |
+### Application Screenshots
 
-| Jenkins Pipeline | Grafana Dashboard | Kubernetes Pods |
-|-----------------|-------------------|-----------------|
-| *Coming soon* | *Coming soon* | *Coming soon* |
+After deploying, capture these screenshots and save to `screenshots/`:
+
+```bash
+# 1. Dashboard:     Open http://YOUR_IP → take screenshot → save as screenshots/dashboard.png
+# 2. Add Expense:   Click "Add Expense" → fill form → screenshot → save as screenshots/add-expense.png
+# 3. Expense List:  Navigate to expenses list → screenshot → save as screenshots/expense-list.png
+# 4. API Docs:      Open http://YOUR_IP/docs → screenshot → save as screenshots/api-docs.png
+```
+
+### DevOps Screenshots
+
+```bash
+# 5. GitHub Actions: Go to repo → Actions tab → screenshot → save as screenshots/github-actions.png
+# 6. Grafana:        Open http://YOUR_IP:3001 → screenshot → save as screenshots/grafana-dashboard.png
+# 7. Prometheus:     Open http://YOUR_IP:9090/targets → screenshot → save as screenshots/prometheus-targets.png
+# 8. Docker:         Run 'docker compose ps' → screenshot → save as screenshots/docker-containers.png
+```
+
+### After Capturing Screenshots
+
+```bash
+# Update this section with actual images:
+git add screenshots/
+git commit -m "docs: add application and DevOps screenshots"
+git push origin main
+```
+
+| Dashboard | Add Expense | API Docs |
+|-----------|-------------|----------|
+| ![Dashboard](screenshots/dashboard.png) | ![Add Expense](screenshots/add-expense.png) | ![API Docs](screenshots/api-docs.png) |
+
+| GitHub Actions | Grafana Dashboard | Prometheus Targets |
+|---------------|-------------------|--------------------|  
+| ![CI/CD](screenshots/github-actions.png) | ![Grafana](screenshots/grafana-dashboard.png) | ![Prometheus](screenshots/prometheus-targets.png) |
+
+---
+
+## ☁️ Production Deployment
+
+> **Full guide:** [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)
+
+### Quick Deploy (Option A: EC2 + Docker Compose)
+
+```bash
+# One-command AWS provisioning + deployment
+bash scripts/provision-aws.sh
+```
+
+Or step-by-step:
+
+```bash
+# 1. Create key pair
+aws ec2 create-key-pair --key-name expense-tracker-key --region ap-south-1 \
+  --query 'KeyMaterial' --output text > ~/.ssh/expense-tracker-key.pem
+chmod 400 ~/.ssh/expense-tracker-key.pem
+
+# 2. Provision infrastructure
+cd terraform
+cp terraform.tfvars.single terraform.tfvars
+terraform init && terraform apply -auto-approve
+SERVER_IP=$(terraform output -raw single_server_public_ip)
+
+# 3. Deploy application
+ssh -i ~/.ssh/expense-tracker-key.pem ubuntu@$SERVER_IP
+sudo bash /opt/expense-tracker/scripts/deploy-production.sh
+
+# 4. Setup HTTPS
+sudo bash /opt/expense-tracker/scripts/setup-ssl.sh
+```
+
+### Public URL
+
+| Service | URL |
+|---------|-----|
+| Frontend | `http://<IP>.nip.io` |
+| API Docs | `http://<IP>.nip.io/docs` |
+| Grafana | `http://<IP>:3001` |
+| Prometheus | `http://<IP>:9090` |
+
+### Cost: **$0/month** (AWS Free Tier) or **~$21/month** (t2.small)
 
 ---
 
