@@ -1,11 +1,10 @@
 import axios from 'axios';
 
 // Create an Axios instance with base URL from environment variable
-// In development: http://localhost:8000/api/v1
-// In Docker:      http://backend:8000/api/v1
-// In production:  Configured via NGINX reverse proxy
+// In Docker/production: Uses relative URL via NGINX reverse proxy
+// Override:  Set REACT_APP_API_URL for direct backend access
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: process.env.REACT_APP_API_URL || '/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
