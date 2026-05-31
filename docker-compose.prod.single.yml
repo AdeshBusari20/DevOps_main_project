@@ -26,7 +26,7 @@ services:
   # ---- PostgreSQL Database ----
   postgres:
     image: postgres:16-alpine
-    container_name: expense-postgres-prod
+    container_name: expense-postgres
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-expense_user}
@@ -53,7 +53,7 @@ services:
   # ---- FastAPI Backend ----
   backend:
     image: adeshbusari20/expense-tracker-backend:latest
-    container_name: expense-backend-prod
+    container_name: expense-backend
     restart: always
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-expense_user}:${POSTGRES_PASSWORD:-expense_pass_change_me}@postgres:5432/${POSTGRES_DB:-expense_tracker}
@@ -86,7 +86,7 @@ services:
   # directly on the host via the mapped port.
   frontend:
     image: adeshbusari20/expense-tracker-frontend:latest
-    container_name: expense-frontend-prod
+    container_name: expense-frontend
     restart: always
     depends_on:
       - backend
@@ -113,7 +113,7 @@ services:
   # After running scripts/setup-ssl.sh, HTTPS is activated.
   nginx:
     image: nginx:1.27-alpine
-    container_name: expense-nginx-prod
+    container_name: expense-nginx
     restart: always
     ports:
       - "80:80"

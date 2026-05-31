@@ -9,7 +9,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: expense-postgres-prod
+    container_name: expense-postgres
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -35,7 +35,7 @@ services:
 
   backend:
     image: adeshbusari20/expense-tracker-backend:latest
-    container_name: expense-backend-prod
+    container_name: expense-backend
     restart: always
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -56,13 +56,12 @@ services:
         reservations:
           cpus: "0.25"
           memory: 256M
-      replicas: 2
     networks:
       - expense-network-prod
 
   frontend:
     image: adeshbusari20/expense-tracker-frontend:latest
-    container_name: expense-frontend-prod
+    container_name: expense-frontend
     restart: always
     depends_on:
       - backend
@@ -79,14 +78,14 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
-    container_name: expense-nginx-prod
+    container_name: expense-nginx
     restart: always
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - frontend
