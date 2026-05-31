@@ -5,7 +5,7 @@
 #   - PostgreSQL (database)
 #   - Backend (FastAPI)
 #   - Frontend (React + Nginx)
-#   - Nginx (reverse proxy + SSL)
+#   - Nginx (reverse proxy)
 #   - Prometheus (metrics)
 #   - Grafana (dashboards)
 #   - AlertManager (alerting)
@@ -80,12 +80,22 @@ services:
       - expense-network-prod
 
   # ---- React Frontend ----
+  # Serves the React SPA via its own internal Nginx on port 80.
+  # The reverse-proxy Nginx (below) forwards / to this container.
+  # If the reverse-proxy is down, the frontend is still reachable
+  # directly on the host via the mapped port.
   frontend:
     image: adeshbusari20/expense-tracker-frontend:latest
     container_name: expense-frontend-prod
     restart: always
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -98,6 +108,9 @@ services:
       - expense-network-prod
 
   # ---- Nginx Reverse Proxy ----
+  # Routes :80 -> frontend + backend, :443 -> HTTPS (after SSL setup)
+  # On fresh deploy, only default.conf (HTTP) is active.
+  # After running scripts/setup-ssl.sh, HTTPS is activated.
   nginx:
     image: nginx:1.27-alpine
     container_name: expense-nginx-prod
@@ -107,11 +120,17 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - frontend
       - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
     deploy:
       resources:
         limits:

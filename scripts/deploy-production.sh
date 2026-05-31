@@ -77,7 +77,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
     PUBLIC_IP=$(curl -s http://checkip.amazonaws.com || curl -s http://ifconfig.me || echo "localhost")
     NIP_DOMAIN="${PUBLIC_IP//./-}.nip.io"
 
-    # Generate strong random password
+    # Generate strong random passwords
     DB_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 32)
     SECRET_KEY=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
     GRAFANA_PASS=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
@@ -108,7 +108,7 @@ POSTGRES_PORT=5432
 DATABASE_URL=postgresql+asyncpg://expense_user:${DB_PASSWORD}@postgres:5432/expense_tracker
 
 # ---- Frontend ----
-REACT_APP_API_URL=http://${PUBLIC_IP}/api/v1
+REACT_APP_API_URL=/api/v1
 FRONTEND_PORT=3000
 
 # ---- Docker Hub ----
@@ -165,8 +165,10 @@ echo -e "${YELLOW}[6/8] Deploying application stack...${NC}"
 
 cd "$APP_DIR"
 
-# Use the all-in-one compose file
+# Tear down any previous deployment
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+
+# Start the full stack
 docker compose -f "$COMPOSE_FILE" up -d
 
 echo -e "  ${GREEN}✅ Stack deployed${NC}"
@@ -175,83 +177,42 @@ echo -e "  ${GREEN}✅ Stack deployed${NC}"
 echo ""
 echo -e "${YELLOW}[7/8] Waiting for services to be healthy...${NC}"
 
-# Wait for PostgreSQL
-echo -n "  PostgreSQL: "
-for i in $(seq 1 30); do
-    if docker compose -f "$COMPOSE_FILE" exec -T postgres pg_isready -U expense_user > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Ready${NC}"
-        break
-    fi
-    if [ "$i" -eq 30 ]; then
-        echo -e "${RED}❌ Timeout${NC}"
-    fi
-    sleep 2
-done
+# Helper: wait for a container health endpoint
+wait_for_service() {
+    local name="$1"
+    local check_cmd="$2"
+    local max_attempts="$3"
+    local delay="$4"
 
-# Wait for Backend
-echo -n "  Backend:    "
-for i in $(seq 1 30); do
-    if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Healthy${NC}"
-        break
-    fi
-    if [ "$i" -eq 30 ]; then
-        echo -e "${YELLOW}⚠️  Still starting (check logs)${NC}"
-    fi
-    sleep 3
-done
+    printf "  %-14s" "${name}:"
+    for i in $(seq 1 "$max_attempts"); do
+        if eval "$check_cmd" > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ Ready${NC}"
+            return 0
+        fi
+        sleep "$delay"
+    done
+    echo -e "${YELLOW}⚠️  Still starting (check logs)${NC}"
+    return 0
+}
 
-# Wait for Frontend
-echo -n "  Frontend:   "
-for i in $(seq 1 15); do
-    if curl -sf http://localhost:3000 > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Running${NC}"
-        break
-    fi
-    if [ "$i" -eq 15 ]; then
-        echo -e "${YELLOW}⚠️  Still starting${NC}"
-    fi
-    sleep 2
-done
+wait_for_service "PostgreSQL" \
+    "docker compose -f $COMPOSE_FILE exec -T postgres pg_isready -U expense_user" 30 2
 
-# Wait for Nginx
-echo -n "  Nginx:      "
-for i in $(seq 1 10); do
-    if curl -sf http://localhost > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Running${NC}"
-        break
-    fi
-    if [ "$i" -eq 10 ]; then
-        echo -e "${YELLOW}⚠️  Still starting${NC}"
-    fi
-    sleep 2
-done
+wait_for_service "Backend" \
+    "docker exec expense-backend-prod curl -sf http://localhost:8000/health" 30 3
 
-# Wait for Grafana
-echo -n "  Grafana:    "
-for i in $(seq 1 20); do
-    if curl -sf http://localhost:3001/api/health > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Running${NC}"
-        break
-    fi
-    if [ "$i" -eq 20 ]; then
-        echo -e "${YELLOW}⚠️  Still starting${NC}"
-    fi
-    sleep 3
-done
+wait_for_service "Frontend" \
+    "docker exec expense-frontend-prod wget -q --spider http://127.0.0.1/" 15 2
 
-# Wait for Prometheus
-echo -n "  Prometheus: "
-for i in $(seq 1 15); do
-    if curl -sf http://localhost:9090/-/ready > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ Running${NC}"
-        break
-    fi
-    if [ "$i" -eq 15 ]; then
-        echo -e "${YELLOW}⚠️  Still starting${NC}"
-    fi
-    sleep 2
-done
+wait_for_service "Nginx" \
+    "docker exec expense-nginx-prod wget -q --spider http://127.0.0.1/" 10 2
+
+wait_for_service "Grafana" \
+    "docker exec grafana wget -q --spider http://127.0.0.1:3000/api/health" 20 3
+
+wait_for_service "Prometheus" \
+    "docker exec prometheus wget -q --spider http://127.0.0.1:9090/-/ready" 15 2
 
 # ---- Step 8: Display results ----
 echo ""

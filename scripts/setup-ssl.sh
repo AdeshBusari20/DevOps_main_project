@@ -27,6 +27,9 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+APP_DIR="/opt/expense-tracker"
+COMPOSE_FILE="docker-compose.prod.single.yml"
+
 echo ""
 echo -e "${CYAN}=============================================="
 echo "  🔐 SSL Certificate Setup (Let's Encrypt)"
@@ -62,18 +65,9 @@ else
 fi
 
 # ---- Stop nginx temporarily for standalone mode ----
-APP_DIR="/opt/expense-tracker"
-COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
-
 echo -e "${YELLOW}⏸️  Temporarily stopping nginx for certificate challenge...${NC}"
-if [ -f "$COMPOSE_FILE" ]; then
-    cd "$APP_DIR"
-    docker compose stop nginx 2>/dev/null || true
-else
-    # Try stopping any nginx container
-    docker stop expense-nginx-prod 2>/dev/null || true
-    docker stop expense-nginx 2>/dev/null || true
-fi
+cd "$APP_DIR"
+docker compose -f "$COMPOSE_FILE" stop nginx 2>/dev/null || true
 
 # ---- Obtain SSL Certificate ----
 echo -e "${YELLOW}🔑 Requesting SSL certificate from Let's Encrypt...${NC}"
@@ -91,9 +85,7 @@ certbot certonly \
         echo -e "${RED}❌ Certificate request failed!${NC}"
         echo "   Make sure port 80 is open and DNS points to this server."
         # Restart nginx
-        if [ -f "$COMPOSE_FILE" ]; then
-            cd "$APP_DIR" && docker compose start nginx 2>/dev/null || true
-        fi
+        cd "$APP_DIR" && docker compose -f "$COMPOSE_FILE" start nginx 2>/dev/null || true
         exit 1
     }
 
@@ -113,30 +105,31 @@ echo -e "${GREEN}✅ Certificates copied to ${SSL_DIR}/${NC}"
 
 # ---- Switch nginx to production HTTPS config ----
 NGINX_CONF_DIR="${APP_DIR}/nginx/conf.d"
-if [ -f "${NGINX_CONF_DIR}/production.conf" ]; then
+SSL_TEMPLATE="${NGINX_CONF_DIR}/production.conf.ssl"
+
+if [ -f "$SSL_TEMPLATE" ]; then
     echo -e "${YELLOW}🔄 Activating HTTPS nginx configuration...${NC}"
-    # Backup current config
+    # Backup current HTTP-only config
     cp "${NGINX_CONF_DIR}/default.conf" "${NGINX_CONF_DIR}/default.conf.http-backup"
     # Activate production HTTPS config
-    cp "${NGINX_CONF_DIR}/production.conf" "${NGINX_CONF_DIR}/default.conf"
+    cp "$SSL_TEMPLATE" "${NGINX_CONF_DIR}/default.conf"
     echo -e "${GREEN}✅ HTTPS nginx configuration activated${NC}"
+else
+    echo -e "${RED}❌ SSL template not found: ${SSL_TEMPLATE}${NC}"
+    echo "   Nginx will continue with HTTP-only configuration."
 fi
 
 # ---- Restart nginx with SSL ----
 echo -e "${YELLOW}🔄 Restarting nginx with SSL...${NC}"
-if [ -f "$COMPOSE_FILE" ]; then
-    cd "$APP_DIR"
-    docker compose restart nginx
-else
-    docker start expense-nginx-prod 2>/dev/null || docker start expense-nginx 2>/dev/null || true
-fi
+cd "$APP_DIR"
+docker compose -f "$COMPOSE_FILE" start nginx
 
 echo -e "${GREEN}✅ Nginx restarted with HTTPS${NC}"
 
 # ---- Setup auto-renewal cron job ----
 echo -e "${YELLOW}⏰ Setting up auto-renewal cron job...${NC}"
 
-RENEWAL_SCRIPT="/opt/expense-tracker/scripts/renew-ssl.sh"
+RENEWAL_SCRIPT="${APP_DIR}/scripts/renew-ssl.sh"
 mkdir -p "$(dirname "$RENEWAL_SCRIPT")"
 
 cat > "$RENEWAL_SCRIPT" << 'RENEW_EOF'
@@ -144,19 +137,20 @@ cat > "$RENEWAL_SCRIPT" << 'RENEW_EOF'
 # SSL Certificate Auto-Renewal Script
 set -e
 APP_DIR="/opt/expense-tracker"
+COMPOSE_FILE="docker-compose.prod.single.yml"
 
 # Renew certificate
 certbot renew --quiet --deploy-hook "
     cp /etc/letsencrypt/live/*/fullchain.pem ${APP_DIR}/nginx/ssl/fullchain.pem
     cp /etc/letsencrypt/live/*/privkey.pem ${APP_DIR}/nginx/ssl/privkey.pem
-    cd ${APP_DIR} && docker compose restart nginx
+    cd ${APP_DIR} && docker compose -f ${COMPOSE_FILE} restart nginx
 "
 RENEW_EOF
 
 chmod +x "$RENEWAL_SCRIPT"
 
 # Add cron job (runs twice daily as recommended by Let's Encrypt)
-CRON_JOB="0 0,12 * * * /opt/expense-tracker/scripts/renew-ssl.sh >> /var/log/ssl-renewal.log 2>&1"
+CRON_JOB="0 0,12 * * * ${APP_DIR}/scripts/renew-ssl.sh >> /var/log/ssl-renewal.log 2>&1"
 (crontab -l 2>/dev/null | grep -v "renew-ssl.sh"; echo "$CRON_JOB") | crontab -
 
 echo -e "${GREEN}✅ Auto-renewal cron job configured (runs twice daily)${NC}"
