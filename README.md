@@ -468,10 +468,10 @@ sudo bash /opt/expense-tracker/scripts/setup-ssl.sh
 
 | Service | URL |
 |---------|-----|
-| Frontend | `http://<IP>.nip.io` |
-| API Docs | `http://<IP>.nip.io/docs` |
-| Grafana | `http://<IP>:3001` |
-| Prometheus | `http://<IP>:9090` |
+| Frontend | `http://13.232.64.107:3000/` |
+| API Docs | `http://13.232.64.107/docs` |
+| Grafana | `http://13.232.64.107:3001/` |
+| Prometheus | `http://13.232.64.107:9090/` |
 
 ### Cost: **$0/month** (AWS Free Tier) or **~$21/month** (t2.small)
 
