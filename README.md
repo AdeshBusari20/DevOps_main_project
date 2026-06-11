@@ -467,11 +467,11 @@ sudo bash /opt/expense-tracker/scripts/setup-ssl.sh
 ### Public URL
 
 | Service | URL |
-|---------|-----|
-| Frontend | `http://13.232.64.107:3000/` |
-| API Docs | `http://13.232.64.107/docs` |
-| Grafana | `http://13.232.64.107:3001/` |
-| Prometheus | `http://13.232.64.107:9090/` |
+|----------|------|
+| Frontend | http://13.232.64.107:3000/ |
+| API Documentation | http://13.232.64.107:8000/docs |
+| Grafana Monitoring | http://13.232.64.107:3001/ |
+| Prometheus Metrics | http://13.232.64.107:9090/ |
 
 ### Cost: **$0/month** (AWS Free Tier) or **~$21/month** (t2.small)
 
